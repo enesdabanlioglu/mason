@@ -7,28 +7,28 @@ import crypto from 'crypto'
 
 export class GoogleContactsAdapter implements IPlatformAdapter {
   private oauth2Client;
+  private redirectUri: string;
 
   constructor() {
     // Normalize the redirect URI - remove trailing slash and ensure proper format
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || ''
-    const redirectUri = `${baseUrl}/api/auth/google/callback`
+    this.redirectUri = `${baseUrl}/api/auth/google/callback`
     
     // Log the redirect URI for debugging (remove in production if sensitive)
     if (process.env.NODE_ENV !== 'production') {
-      console.log('Google OAuth Redirect URI:', redirectUri)
+      console.log('Google OAuth Redirect URI:', this.redirectUri)
     }
     
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      redirectUri
+      this.redirectUri
     )
   }
 
   getAuthUrl(): string {
-    const redirectUri = this.oauth2Client.redirectUri
     if (process.env.NODE_ENV !== 'production') {
-      console.log('Generating auth URL with redirect URI:', redirectUri)
+      console.log('Generating auth URL with redirect URI:', this.redirectUri)
     }
     
     return this.oauth2Client.generateAuthUrl({
@@ -47,11 +47,10 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
     } catch (error: any) {
       // Log redirect URI mismatch errors with helpful message
       if (error?.message?.includes('redirect_uri_mismatch') || error?.code === 'redirect_uri_mismatch') {
-        const redirectUri = this.oauth2Client.redirectUri
         console.error('Redirect URI Mismatch Error!')
-        console.error('Expected redirect URI:', redirectUri)
+        console.error('Expected redirect URI:', this.redirectUri)
         console.error('Make sure this exact URL is added to Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client IDs > Authorized redirect URIs')
-        throw new Error(`Redirect URI mismatch. Expected: ${redirectUri}. Please add this exact URL to your Google Cloud Console OAuth credentials.`)
+        throw new Error(`Redirect URI mismatch. Expected: ${this.redirectUri}. Please add this exact URL to your Google Cloud Console OAuth credentials.`)
       }
       throw error
     }
