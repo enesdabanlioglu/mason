@@ -9,14 +9,28 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
   private oauth2Client;
 
   constructor() {
+    // Normalize the redirect URI - remove trailing slash and ensure proper format
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || ''
+    const redirectUri = `${baseUrl}/api/auth/google/callback`
+    
+    // Log the redirect URI for debugging (remove in production if sensitive)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Google OAuth Redirect URI:', redirectUri)
+    }
+    
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
+      redirectUri
     )
   }
 
   getAuthUrl(): string {
+    const redirectUri = this.oauth2Client.redirectUri
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Generating auth URL with redirect URI:', redirectUri)
+    }
+    
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: ['https://www.googleapis.com/auth/contacts.readonly', 'profile', 'email'],
@@ -25,8 +39,22 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
   }
 
   async handleCallback(code: string, userId: string): Promise<void> {
-    const { tokens } = await this.oauth2Client.getToken(code)
-    this.oauth2Client.setCredentials(tokens)
+    let tokens
+    try {
+      const tokenResponse = await this.oauth2Client.getToken(code)
+      tokens = tokenResponse.tokens
+      this.oauth2Client.setCredentials(tokens)
+    } catch (error: any) {
+      // Log redirect URI mismatch errors with helpful message
+      if (error?.message?.includes('redirect_uri_mismatch') || error?.code === 'redirect_uri_mismatch') {
+        const redirectUri = this.oauth2Client.redirectUri
+        console.error('Redirect URI Mismatch Error!')
+        console.error('Expected redirect URI:', redirectUri)
+        console.error('Make sure this exact URL is added to Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client IDs > Authorized redirect URIs')
+        throw new Error(`Redirect URI mismatch. Expected: ${redirectUri}. Please add this exact URL to your Google Cloud Console OAuth credentials.`)
+      }
+      throw error
+    }
 
     // Use service role client to bypass RLS and PostgREST cache issues
     const supabase = createServiceRoleClient()
