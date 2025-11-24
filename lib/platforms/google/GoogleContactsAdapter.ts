@@ -1,7 +1,7 @@
 import { google, people_v1 } from 'googleapis'
 import { IPlatformAdapter } from '@/types/platform'
 import { Contact } from '@/types/index'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 import { encrypt, decrypt } from '@/lib/encryption'
 import crypto from 'crypto'
 
@@ -28,7 +28,8 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
     const { tokens } = await this.oauth2Client.getToken(code)
     this.oauth2Client.setCredentials(tokens)
 
-    const supabase = await createClient()
+    // Use service role client to bypass RLS and PostgREST cache issues
+    const supabase = createServiceRoleClient()
     
     const { error } = await supabase.from('user_platform_connections').upsert({
       user_id: userId,
@@ -47,7 +48,8 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
   }
 
   async fetchContacts(userId: string): Promise<Contact[]> {
-    const supabase = await createClient()
+    // Use service role client for fetching connections
+    const supabase = createServiceRoleClient()
     const { data: connection } = await supabase
       .from('user_platform_connections')
       .select('*')
@@ -125,8 +127,25 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
             }
             nextPageToken = res.data.nextPageToken || undefined
         } while (nextPageToken)
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching contacts', error)
+        
+        // Check for specific API errors
+        if (error?.code === 403 || error?.status === 403) {
+            const errorMessage = error?.message || ''
+            if (errorMessage.includes('People API has not been used') || errorMessage.includes('it is disabled')) {
+                throw new Error(
+                    'Google People API is not enabled. Please enable it in your Google Cloud Console: ' +
+                    'https://console.cloud.google.com/apis/library/people.googleapis.com'
+                )
+            }
+            if (errorMessage.includes('insufficient authentication scopes')) {
+                throw new Error(
+                    'Insufficient permissions. Please reconnect your Google account with the required permissions.'
+                )
+            }
+        }
+        
         throw error
     }
 
@@ -134,7 +153,7 @@ export class GoogleContactsAdapter implements IPlatformAdapter {
   }
 
   async disconnect(userId: string): Promise<void> {
-     const supabase = await createClient()
+     const supabase = createServiceRoleClient()
      await supabase.from('user_platform_connections').delete().eq('user_id', userId).eq('platform', 'google')
   }
 }

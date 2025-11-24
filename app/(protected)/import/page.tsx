@@ -4,10 +4,11 @@ import { ImportPageContent } from "@/components/import/ImportPageContent"
 export default async function ImportPage({
     searchParams
 }: {
-    searchParams: { [key: string]: string | string[] | undefined }
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const params = await searchParams
 
     const { data: connections } = await supabase
         .from('user_platform_connections')
@@ -25,7 +26,7 @@ export default async function ImportPage({
             
             <ImportPageContent 
                 initialConnections={connections || []} 
-                searchParams={searchParams}
+                searchParams={params}
             />
         </div>
     )

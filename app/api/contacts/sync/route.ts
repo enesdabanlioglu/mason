@@ -50,6 +50,17 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Sync error', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    
+    // Provide more helpful error messages for common issues
+    let status = 500
+    if (message.includes('People API is not enabled')) {
+      status = 400 // Bad Request - configuration issue
+    } else if (message.includes('Not connected')) {
+      status = 401 // Unauthorized - not connected
+    } else if (message.includes('Insufficient permissions')) {
+      status = 403 // Forbidden - permission issue
+    }
+    
+    return NextResponse.json({ error: message }, { status })
   }
 }

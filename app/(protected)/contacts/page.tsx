@@ -5,18 +5,19 @@ import { AddContactDialog } from "@/components/contacts/AddContactDialog"
 export default async function ContactsPage({
     searchParams
 }: {
-    searchParams: { page?: string, query?: string }
+    searchParams: Promise<{ page?: string, query?: string }>
 }) {
     const supabase = await createClient()
-    const page = Number(searchParams.page) || 1
+    const params = await searchParams
+    const page = Number(params.page) || 1
     const pageSize = 20
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
     
     let query = supabase.from('contacts').select('*', { count: 'exact' })
     
-    if (searchParams.query) {
-        query = query.or(`name.ilike.%${searchParams.query}%,company.ilike.%${searchParams.query}%`)
+    if (params.query) {
+        query = query.or(`name.ilike.%${params.query}%,company.ilike.%${params.query}%`)
     }
     
     const { data: contacts, count } = await query.range(from, to).order('created_at', { ascending: false })
