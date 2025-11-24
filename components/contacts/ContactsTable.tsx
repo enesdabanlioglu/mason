@@ -23,6 +23,7 @@ interface ContactsTableProps {
     currentPage: number
 }
 
+// ContactsTable component for displaying contacts in a table format
 export function ContactsTable({ contacts, pageCount, currentPage }: ContactsTableProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -121,3 +122,5 @@ export function ContactsTable({ contacts, pageCount, currentPage }: ContactsTabl
         </div>
     )
 }
+
+export default ContactsTable
