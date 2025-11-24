@@ -16,3 +16,4 @@ export interface IPlatformAdapter {
   disconnect(userId: string): Promise<void>
 }
 
+
